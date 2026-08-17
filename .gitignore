@@ -1,0 +1,119 @@
+# =============================================================
+# MergeMind – Root .gitignore
+# =============================================================
+
+# ──────────────────────────────────────────────────────────────
+# Python / Backend
+# ──────────────────────────────────────────────────────────────
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Environment variables (secrets!)
+.env
+.env.*
+!.env.example
+
+# Byte-compiled / optimised files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.coveragerc
+
+# MyPy / type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyright
+pyrightconfig.json
+
+# Ruff / linter caches
+.ruff_cache/
+
+# ──────────────────────────────────────────────────────────────
+# Backend – cloned repos & runtime data
+# ──────────────────────────────────────────────────────────────
+backend/data/repos/
+backend/data/
+
+# ──────────────────────────────────────────────────────────────
+# Node / Frontend
+# ──────────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+
+# Vite build output
+frontend/dist/
+frontend/.vite/
+
+# Local env files (Vite)
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Parcel cache
+.cache/
+.parcel-cache/
+
+# ──────────────────────────────────────────────────────────────
+# IDEs & Editors
+# ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+
+# ──────────────────────────────────────────────────────────────
+# OS generated files
+# ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ──────────────────────────────────────────────────────────────
+# Logs
+# ──────────────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ──────────────────────────────────────────────────────────────
+# Docker
+# ──────────────────────────────────────────────────────────────
+# Keep docker-compose.yml but ignore overrides with secrets
+docker-compose.override.yml

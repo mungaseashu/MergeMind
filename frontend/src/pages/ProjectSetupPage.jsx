@@ -6,7 +6,9 @@ import axios from 'axios';
 const BRAIN_API = 'http://localhost:8000/api/brain';
 
 export default function ProjectSetupPage() {
+  const [projectName, setProjectName] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
+  const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -16,10 +18,15 @@ export default function ProjectSetupPage() {
     setError('');
     setLoading(true);
     try {
-      const res = await axios.post(`${BRAIN_API}/index`, { repository_url: repoUrl });
+      const res = await axios.post(`${BRAIN_API}/index`, {
+        project_name: projectName,
+        repository_url: repoUrl,
+        github_token: githubToken,
+      });
       // Store job_id so DashboardHome can poll it
       localStorage.setItem('mm_job_id', res.data.job_id);
       localStorage.setItem('mm_repo_url', repoUrl);
+      localStorage.setItem('mm_project_name', projectName);
       navigate('/dashboard');
     } catch (err) {
       const msg = err.response?.data?.detail;
@@ -53,6 +60,23 @@ export default function ProjectSetupPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
+              Project Name
+            </label>
+            <div className="relative">
+              <input
+                id="project-name"
+                type="text"
+                required
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="My Awesome Project"
+                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
               GitHub Repository URL
             </label>
             <div className="relative">
@@ -82,6 +106,8 @@ export default function ProjectSetupPage() {
               <input
                 id="access-token"
                 type="password"
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                 className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl pl-12 pr-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm"
               />

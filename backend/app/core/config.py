@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     GITHUB_WEBHOOK_SECRET: str = "mergemind-webhook-secret"
     GITHUB_TOKEN: Optional[str] = None
     JWT_SECRET: str = "mergemind-jwt-secret-key-please-change-in-prod"
+    WEBHOOK_BASE_URL: Optional[str] = None
 
     model_config = ConfigDict(env_file=".env", extra="ignore")
 

@@ -98,3 +98,22 @@ class RelationshipBuilder:
         """
         with neo4j_client.get_session() as session:
             session.run(query, endpoint_id=endpoint_id, func_id=func_id)
+
+    def link_pr_to_repository(self, pr_id: str, repo_id: str):
+        """Links a PullRequest to its target Repository."""
+        query = """
+        MATCH (pr:PullRequest {id: $pr_id}), (r:Repository {id: $repo_id})
+        MERGE (pr)-[:TARGETS]->(r)
+        """
+        with neo4j_client.get_session() as session:
+            session.run(query, pr_id=pr_id, repo_id=repo_id)
+
+    def link_pr_to_file(self, pr_id: str, file_id: str):
+        """Links a PullRequest to a File that it modifies."""
+        query = """
+        MATCH (pr:PullRequest {id: $pr_id}), (f:File {id: $file_id})
+        MERGE (pr)-[:MODIFIES]->(f)
+        """
+        with neo4j_client.get_session() as session:
+            session.run(query, pr_id=pr_id, file_id=file_id)
+

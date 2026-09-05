@@ -12,6 +12,7 @@ def setup_constraints():
         "CREATE CONSTRAINT endpoint_id_unique IF NOT EXISTS FOR (n:Endpoint) REQUIRE n.id IS UNIQUE",
         "CREATE CONSTRAINT database_id_unique IF NOT EXISTS FOR (n:Database) REQUIRE n.id IS UNIQUE",
         "CREATE CONSTRAINT table_id_unique IF NOT EXISTS FOR (n:Table) REQUIRE n.id IS UNIQUE",
+        "CREATE CONSTRAINT pullrequest_id_unique IF NOT EXISTS FOR (n:PullRequest) REQUIRE n.id IS UNIQUE",
     ]
 
     with neo4j_client.get_session() as session:

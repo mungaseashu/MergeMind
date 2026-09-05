@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from app.api.brain import router as brain_router
+from app.api.webhooks import router as webhooks_router
 
 app = FastAPI(
     title="MergeMind Codebase Brain API",
@@ -18,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(brain_router, prefix="/api/brain", tags=["brain"])
+app.include_router(webhooks_router, prefix="/api/webhooks", tags=["webhooks"])
 
 @app.get("/health")
 async def health_check():

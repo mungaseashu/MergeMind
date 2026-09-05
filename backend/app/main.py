@@ -1,8 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+
 from app.api.brain import router as brain_router
 from app.api.webhooks import router as webhooks_router
+from app.api.auth import router as auth_router
+from app.database import engine, Base
+
+# Create all SQLAlchemy tables (users, etc.) on startup if they don't exist
+import app.models.user  # noqa: F401 — ensure model is registered with Base
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="MergeMind Codebase Brain API",
@@ -18,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(brain_router, prefix="/api/brain", tags=["brain"])
 app.include_router(webhooks_router, prefix="/api/webhooks", tags=["webhooks"])
 

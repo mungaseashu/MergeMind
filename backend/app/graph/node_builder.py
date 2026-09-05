@@ -1,6 +1,6 @@
 from app.graph.neo4j_client import neo4j_client
 from app.models.code_entities import (
-    DirectoryModel, FileModel, ClassModel, FunctionModel, EndpointModel
+    DirectoryModel, FileModel, ClassModel, FunctionModel, EndpointModel, PullRequestModel
 )
 
 class NodeBuilder:
@@ -95,3 +95,57 @@ class NodeBuilder:
                 query, id=e.id, method=e.method, path=e.path,
                 file_id=e.file_id, function_id=e.function_id, framework=e.framework
             )
+
+    def create_pull_request(self, pr: PullRequestModel):
+        """Creates or updates a PullRequest node in Neo4j."""
+        query = """
+        MERGE (pr:PullRequest {id: $id})
+        SET pr.pr_number = $pr_number,
+            pr.title = $title,
+            pr.author = $author,
+            pr.status = $status,
+            pr.base_branch = $base_branch,
+            pr.head_branch = $head_branch,
+            pr.repository_id = $repository_id,
+            pr.github_url = $github_url,
+            pr.created_at = $created_at,
+            pr.updated_at = timestamp()
+        """
+        with neo4j_client.get_session() as session:
+            session.run(
+                query,
+                id=pr.id,
+                pr_number=pr.pr_number,
+                title=pr.title,
+                author=pr.author,
+                status=pr.status,
+                base_branch=pr.base_branch,
+                head_branch=pr.head_branch,
+                repository_id=pr.repository_id,
+                github_url=pr.github_url,
+                created_at=pr.created_at
+            )
+
+    def update_pull_request_status(self, pr_id: str, status: str):
+        """Updates only the status field of an existing PullRequest node."""
+        query = """
+        MATCH (pr:PullRequest {id: $pr_id})
+        SET pr.status = $status,
+            pr.closed_at = timestamp()
+        """
+        with neo4j_client.get_session() as session:
+            session.run(query, pr_id=pr_id, status=status)
+
+    def delete_file_entities(self, file_id: str):
+        """
+        Removes a deleted file and all its owned Code entities (Classes, Functions)
+        from the graph. Uses DETACH DELETE to also remove all relationships.
+        """
+        query = """
+        MATCH (f:File {id: $file_id})
+        OPTIONAL MATCH (f)-[:DEFINES]->(entity)
+        DETACH DELETE entity, f
+        """
+        with neo4j_client.get_session() as session:
+            session.run(query, file_id=file_id)
+

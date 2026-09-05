@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 class CodeEntity(BaseModel):
     id: str
@@ -54,3 +54,22 @@ class CallModel(BaseModel):
     function_id: str
     called_name: str
     line: int
+
+class PullRequestModel(CodeEntity):
+    pr_number: int
+    title: str
+    author: str
+    status: Literal["OPEN", "MERGED", "CLOSED"] = "OPEN"
+    base_branch: str
+    head_branch: str
+    repository_id: str
+    github_url: str
+    created_at: int  # unix timestamp in ms
+
+class PullRequestFileModel(BaseModel):
+    """Represents a single file changed in a Pull Request."""
+    filename: str
+    status: Literal["added", "modified", "removed", "renamed"]
+    pr_id: str
+    file_id: str  # The corresponding File node id in Neo4j (if it exists)
+

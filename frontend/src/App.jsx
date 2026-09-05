@@ -4,7 +4,39 @@ import { Database, Search, Folder, File, Code, Box, Activity, CheckCircle, Alert
 
 const API_BASE = 'http://localhost:8000/api/brain';
 
+import { Routes, Route } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import ProjectSetupPage from './pages/ProjectSetupPage';
+import DashboardLayout from './pages/DashboardLayout';
+import DashboardHome from './pages/DashboardHome';
+import AddDocPage from './pages/AddDocPage';
+import ArchitecturePage from './pages/ArchitecturePage';
+
 function App() {
+  return (
+    <Routes>
+      {/* Old BrainBuilder route is preserved but maybe deprecated soon */}
+      <Route path="/legacy" element={<BrainBuilder />} />
+      
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<LoginPage />} />
+      <Route path="/setup" element={<ProjectSetupPage />} />
+      
+      <Route path="/dashboard" element={<DashboardLayout />}>
+        <Route index element={<DashboardHome />} />
+        <Route path="add-doc" element={<AddDocPage />} />
+        <Route path="architecture" element={<ArchitecturePage />} />
+      </Route>
+      
+      {/* Redirect root to dashboard for now */}
+      <Route path="/" element={<DashboardLayout />}>
+        <Route index element={<DashboardHome />} />
+      </Route>
+    </Routes>
+  );
+}
+
+function BrainBuilder() {
   const [repoUrl, setRepoUrl] = useState('https://github.com/tiangolo/fastapi');
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null);

@@ -25,7 +25,7 @@ export default function LoginPage({ mode = 'login' }) {
         navigate('/setup');
       } else {
         await login(form.email, form.password);
-        navigate('/setup');
+        navigate('/dashboard');
       }
     } catch (err) {
       const msg = err.response?.data?.detail;

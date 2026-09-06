@@ -19,7 +19,7 @@ class IndexingPipeline:
         self.nb = NodeBuilder()
         self.rb = RelationshipBuilder()
 
-    def start_job(self, repo_url: str) -> str:
+    def start_job(self, repo_url: str, github_token: str = None) -> str:
         job_id = str(uuid.uuid4())
         indexing_jobs[job_id] = {
             "status": "QUEUED",
@@ -33,7 +33,7 @@ class IndexingPipeline:
         }
         
         # Start async thread
-        thread = threading.Thread(target=self._run_pipeline, args=(job_id, repo_url))
+        thread = threading.Thread(target=self._run_pipeline, args=(job_id, repo_url, github_token))
         thread.start()
         
         return job_id
@@ -45,10 +45,10 @@ class IndexingPipeline:
         if job_id in indexing_jobs:
             indexing_jobs[job_id].update(kwargs)
 
-    def _run_pipeline(self, job_id: str, repo_url: str):
+    def _run_pipeline(self, job_id: str, repo_url: str, github_token: str = None):
         try:
             self._update_job(job_id, status="CLONING", progress=10)
-            repo_data = repository_manager.process_repository(repo_url)
+            repo_data = repository_manager.process_repository(repo_url, github_token)
             local_path = repo_data["local_path"]
             repo_info = repo_data["info"]
 

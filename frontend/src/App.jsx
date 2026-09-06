@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
@@ -17,7 +18,11 @@ function ProtectedRoute({ children }) {
 /** Redirects already-logged-in users away from auth pages */
 function GuestRoute({ children }) {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+  // Only redirect if they were ALREADY authenticated when they visited the route.
+  // This prevents GuestRoute from hijacking the routing when a user logs in/signs up.
+  const [wasAuthenticated] = useState(isAuthenticated);
+  
+  return wasAuthenticated ? <Navigate to="/dashboard" replace /> : children;
 }
 
 export default function App() {

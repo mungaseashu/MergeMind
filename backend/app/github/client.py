@@ -12,12 +12,16 @@ class GitHubClient:
         else:
             self.client = Github()
 
-    def get_repository_info(self, repo_full_name: str):
+    def get_repository_info(self, repo_full_name: str, token: str = None):
         """
         repo_full_name format: 'owner/repo'
         """
         try:
-            repo = self.client.get_repo(repo_full_name)
+            client = self.client
+            if token:
+                client = Github(auth=Auth.Token(token))
+            
+            repo = client.get_repo(repo_full_name)
             return {
                 "owner": repo.owner.login,
                 "name": repo.name,

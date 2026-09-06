@@ -24,7 +24,7 @@ async def start_indexing(req: IndexRequest):
     try:
         # Pass project_name to start_job (we need to update start_job signature if we want to store it, 
         # but for now we just start the pipeline for the repo)
-        job_id = pipeline.start_job(req.repository_url)
+        job_id = pipeline.start_job(req.repository_url, req.github_token)
         return {
             "job_id": job_id,
             "repository": req.repository_url,

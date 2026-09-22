@@ -13,6 +13,8 @@ from pathlib import Path
 
 # In-memory dictionary to track job statuses (In production, use Redis or DB)
 indexing_jobs = {}
+# In-memory token store for webhooks (In production, use DB)
+repo_tokens = {}
 
 class IndexingPipeline:
     def __init__(self):

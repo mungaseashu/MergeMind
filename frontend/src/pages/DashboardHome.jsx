@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Calendar, CheckCircle2, Clock, AlertCircle, CircleDashed, Loader2, CheckCircle, TriangleAlert } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const BRAIN_API = 'http://localhost:8000/api/brain';
 
@@ -10,43 +11,81 @@ export default function DashboardHome() {
 
   // ── Indexing job polling ─────────────────────────────────────────────────
   const [jobStatus, setJobStatus] = useState(null);
-  const [jobId] = useState(() => localStorage.getItem('mm_job_id'));
-  const [repoUrl] = useState(() => localStorage.getItem('mm_repo_url') || '');
+  const [repoUrl, setRepoUrl] = useState(() => localStorage.getItem('mm_repo_url') || '');
+  const [availableRepos, setAvailableRepos] = useState([]);
+  const navigate = useNavigate();
+
+  // 1. Fetch available repositories from Neo4j (for returning users)
+  useEffect(() => {
+    const fetchRepos = async () => {
+      try {
+        const res = await axios.get(`${BRAIN_API}/repositories`);
+        setAvailableRepos(res.data);
+        
+        // Auto-select first repo if none is selected, OR if localStorage is corrupted
+        const isValidUrl = res.data.some(r => r.url === repoUrl);
+        if ((!repoUrl || !isValidUrl) && res.data.length > 0) {
+          const firstRepoUrl = res.data[0].url;
+          setRepoUrl(firstRepoUrl);
+          localStorage.setItem('mm_repo_url', firstRepoUrl);
+          localStorage.setItem('mm_project_name', res.data[0].name);
+        } else if (!repoUrl && res.data.length === 0) {
+          // If totally empty graph, force them to setup
+          navigate('/setup');
+        }
+      } catch (err) {
+        console.error("Failed to load repositories", err);
+      }
+    };
+    fetchRepos();
+  }, [repoUrl, navigate]);
 
   useEffect(() => {
-    if (!jobId) return;
+    if (!repoUrl) return;
     let interval;
     const poll = async () => {
       try {
-        const res = await axios.get(`${BRAIN_API}/status/${jobId}`);
+        const res = await axios.get(`${BRAIN_API}/status/latest?repo_url=${encodeURIComponent(repoUrl)}`);
         setJobStatus(res.data);
-        if (res.data.status === 'COMPLETED' || res.data.status === 'FAILED') {
-          clearInterval(interval);
-        }
       } catch {
-        clearInterval(interval);
+        // ignore errors
       }
     };
     poll();
-    interval = setInterval(poll, 2000);
+    // Continue polling to seamlessly pick up new background jobs from webhooks
+    interval = setInterval(poll, 3000);
     return () => clearInterval(interval);
-  }, [jobId]);
+  }, [repoUrl]);
 
-  // ── Static stats ─────────────────────────────────────────────────────────
+  const [dashboardData, setDashboardData] = useState({
+    active_prs: [],
+    stats: { total_prs: 0, active_prs: 0, total_files: 0, total_entities: 0 }
+  });
+
+  useEffect(() => {
+    if (!repoUrl) return;
+    const fetchDashboard = async () => {
+      try {
+        const res = await axios.get(`${BRAIN_API}/dashboard?repo_url=${encodeURIComponent(repoUrl)}`);
+        setDashboardData(res.data);
+      } catch {
+        // ignore
+      }
+    };
+    fetchDashboard();
+    const interval = setInterval(fetchDashboard, 5000); // Poll every 5s for dashboard updates
+    return () => clearInterval(interval);
+  }, [repoUrl]);
+
+  // ── Stats ─────────────────────────────────────────────────────────
   const stats = [
-    { label: 'Total Requests', value: 42, trend: '+12 this week', icon: CircleDashed, color: 'text-gray-500' },
-    { label: 'Active PRs', value: 18, trend: '4 need review', icon: Clock, color: 'text-blue-500' },
-    { label: 'High Priority', value: 5, trend: '-2 since yesterday', icon: AlertCircle, color: 'text-orange-500' },
-    { label: 'Low Priority', value: 13, trend: '+5 this week', icon: CheckCircle2, color: 'text-green-500' },
+    { label: 'Total Pull Requests', value: dashboardData.stats.total_prs, trend: 'All time', icon: CircleDashed, color: 'text-gray-500' },
+    { label: 'Active PRs', value: dashboardData.stats.active_prs, trend: 'Open', icon: Clock, color: 'text-blue-500' },
+    { label: 'Total Files Indexed', value: dashboardData.stats.total_files, trend: 'In graph', icon: CheckCircle2, color: 'text-green-500' },
+    { label: 'Classes & Functions', value: dashboardData.stats.total_entities, trend: 'In graph', icon: CheckCircle2, color: 'text-indigo-500' },
   ];
 
-  const activePRs = [
-    { id: 1, title: 'Implement new auth flow', author: 'Amélie Laurent', priority: 'High', status: 'In review', time: '2h ago' },
-    { id: 2, title: 'Fix navigation bug on mobile', author: 'Floyd Miles', priority: 'High', status: 'In progress', time: '4h ago' },
-    { id: 3, title: 'Update dependency packages', author: 'Guy Hawkins', priority: 'Low', status: 'Pending', time: '1d ago' },
-    { id: 4, title: 'Refactor state management', author: 'Kristin Watson', priority: 'Low', status: 'In review', time: '1d ago' },
-    { id: 5, title: 'Add unit tests for API client', author: 'Amélie Laurent', priority: 'Low', status: 'In progress', time: '2d ago' },
-  ];
+  const activePRs = dashboardData.active_prs;
 
   const today = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
   const firstName = user?.username?.split(' ')[0] || 'there';
@@ -54,23 +93,52 @@ export default function DashboardHome() {
   return (
     <div className="p-8 lg:p-12">
       {/* Header */}
-      <div className="flex justify-between items-start mb-10">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-10 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Hello, {firstName} 👋
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            Here's the current status of your pull requests.
+            Here's the current status of your repositories.
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-4 py-2 shadow-sm">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{today}</span>
-          <Calendar className="w-4 h-4 text-gray-400" />
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Project Switcher */}
+          {availableRepos.length > 0 && (
+            <select
+              value={repoUrl}
+              onChange={(e) => {
+                const url = e.target.value;
+                const repo = availableRepos.find(r => r.url === url);
+                setRepoUrl(url);
+                localStorage.setItem('mm_repo_url', url);
+                if (repo) localStorage.setItem('mm_project_name', repo.name);
+              }}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+            >
+              {availableRepos.map(r => (
+                <option key={r.id} value={r.url}>{r.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Add New Project Button */}
+          <button
+            onClick={() => navigate('/setup')}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white border border-transparent rounded-full px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+          >
+            + Add New Project
+          </button>
+
+          <div className="hidden sm:flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-4 py-2 shadow-sm">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{today}</span>
+            <Calendar className="w-4 h-4 text-gray-400" />
+          </div>
         </div>
       </div>
 
       {/* Indexing job status card */}
-      {jobId && jobStatus && (
+      {jobStatus && jobStatus.status !== 'IDLE' && (
         <div className={`mb-8 rounded-2xl border p-6 ${
           jobStatus.status === 'COMPLETED'
             ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
@@ -150,15 +218,21 @@ export default function DashboardHome() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {activePRs.map((pr) => (
+                {activePRs.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="py-8 px-6 text-center text-gray-500 dark:text-gray-400">
+                      No pull requests found for this repository.
+                    </td>
+                  </tr>
+                ) : activePRs.map((pr) => (
                   <tr key={pr.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs">
-                          {pr.author.charAt(0)}
+                          {pr.author.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white text-sm">{pr.title}</p>
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">#{pr.id} {pr.title}</p>
                           <p className="text-xs text-gray-500">{pr.author}</p>
                         </div>
                       </div>
@@ -174,9 +248,15 @@ export default function DashboardHome() {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">{pr.status}</span>
+                      <span className={`text-sm font-medium ${
+                        pr.status === 'OPEN' ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'
+                      }`}>
+                        {pr.status}
+                      </span>
                     </td>
-                    <td className="py-4 px-6 text-sm text-gray-500">{pr.time}</td>
+                    <td className="py-4 px-6 text-sm text-gray-500">
+                      {new Date(pr.timestamp).toLocaleDateString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>

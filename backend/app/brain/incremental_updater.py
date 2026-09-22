@@ -20,13 +20,15 @@ from app.graph.relationship_builder import RelationshipBuilder
 from app.models.code_entities import FileModel, ClassModel, FunctionModel, EndpointModel
 
 
-def _get_github_client() -> Github:
-    if settings.GITHUB_TOKEN:
-        return Github(auth=Auth.Token(settings.GITHUB_TOKEN))
+def _get_github_client(github_token: str = None) -> Github:
+    # Use provided token first, then fallback to settings
+    token = github_token or settings.GITHUB_TOKEN
+    if token:
+        return Github(auth=Auth.Token(token))
     return Github()
 
 
-def get_changed_files(repo_full_name: str, pr_number: int) -> List[Dict]:
+def get_changed_files(repo_full_name: str, pr_number: int, github_token: str = None) -> List[Dict]:
     """
     Queries the GitHub API to get the list of files changed in a specific PR.
 
@@ -35,7 +37,7 @@ def get_changed_files(repo_full_name: str, pr_number: int) -> List[Dict]:
         - status (str): 'added' | 'modified' | 'removed' | 'renamed'
         - raw_url (str): Direct URL to download the file's content at the PR's head commit
     """
-    g = _get_github_client()
+    g = _get_github_client(github_token)
     repo = g.get_repo(repo_full_name)
     pr = repo.get_pull(pr_number)
 
@@ -50,7 +52,7 @@ def get_changed_files(repo_full_name: str, pr_number: int) -> List[Dict]:
     return changed
 
 
-def process_changed_files(repo_id: str, changed_files: List[Dict]):
+def process_changed_files(repo_id: str, changed_files: List[Dict], github_token: str = None):
     """
     Processes the changed file list and updates the Neo4j graph accordingly.
 
@@ -61,8 +63,6 @@ def process_changed_files(repo_id: str, changed_files: List[Dict]):
     nb = NodeBuilder()
     rb = RelationshipBuilder()
     neo4j_client.connect()
-
-    g = _get_github_client()
 
     stats = {"upserted": 0, "deleted": 0, "skipped": 0, "errors": []}
 
@@ -81,7 +81,10 @@ def process_changed_files(repo_id: str, changed_files: List[Dict]):
         # For added / modified / renamed: download and process the file
         try:
             import requests
-            response = requests.get(f["raw_url"], timeout=15)
+            headers = {}
+            if github_token:
+                headers["Authorization"] = f"token {github_token}"
+            response = requests.get(f["raw_url"], headers=headers, timeout=15)
             response.raise_for_status()
             source_code = response.text
         except Exception as e:

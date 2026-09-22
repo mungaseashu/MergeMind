@@ -11,6 +11,12 @@ class Neo4jClient:
                 settings.NEO4J_URI,
                 auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
             )
+            # Warm up schema to prevent UNRECOGNIZED warnings for PullRequest properties
+            try:
+                with self.driver.session() as session:
+                    session.run("MERGE (pr:PullRequest {id: 'dummy'}) SET pr.title='', pr.author='', pr.status='', pr.created_at=0, pr.pr_number=0 WITH pr MERGE (r:Repository {id:'dummy'}) MERGE (pr)-[:TARGETS]->(r) DETACH DELETE pr")
+            except Exception:
+                pass
 
     def close(self):
         if self.driver:

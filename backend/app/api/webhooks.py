@@ -57,16 +57,34 @@ async def github_webhook(
         if action not in SUPPORTED_PR_ACTIONS:
             return {"status": "ignored", "reason": f"PR action '{action}' is not handled"}
 
+        repo_url = payload.get("repository", {}).get("html_url")
+        from app.brain.indexing_pipeline import repo_tokens
+        from app.core.config import settings
+        token = repo_tokens.get(repo_url) or settings.GITHUB_TOKEN if repo_url else settings.GITHUB_TOKEN
+
         if action in ("opened", "reopened"):
-            result = handle_pr_opened(payload)
+            result = handle_pr_opened(payload, github_token=token)
         elif action == "synchronize":
-            result = handle_pr_synchronize(payload)
+            result = handle_pr_synchronize(payload, github_token=token)
         elif action == "closed":
             result = handle_pr_closed(payload)
         else:
             result = {"status": "ignored"}
 
         return result
+
+    if event == "push":
+        # A push to the default branch means the codebase changed directly.
+        # We trigger a background re-scan. Neo4j MERGE ensures we just update/add new nodes.
+        repo_url = payload.get("repository", {}).get("html_url")
+        if repo_url:
+            from app.brain.indexing_pipeline import pipeline, repo_tokens
+            from app.core.config import settings
+            # Try to get token from memory first, then fallback to .env settings
+            token = repo_tokens.get(repo_url) or settings.GITHUB_TOKEN
+            pipeline.start_job(repo_url, token)
+            return {"status": "accepted", "action": "re-indexing"}
+        return {"status": "ignored", "reason": "No repository URL in payload"}
 
     # Any other event (stars, issues, etc.) — acknowledge but don't process
     return {"status": "ignored", "reason": f"Event '{event}' is not handled by MergeMind"}

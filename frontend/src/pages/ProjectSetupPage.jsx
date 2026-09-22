@@ -6,27 +6,48 @@ import axios from 'axios';
 const BRAIN_API = 'http://localhost:8000/api/brain';
 
 export default function ProjectSetupPage() {
-  const [projectName, setProjectName] = useState('');
-  const [repoUrl, setRepoUrl] = useState('');
   const [githubToken, setGithubToken] = useState('');
+  const [repos, setRepos] = useState([]);
+  const [selectedRepo, setSelectedRepo] = useState(null);
+  const [fetchingRepos, setFetchingRepos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  const fetchRepos = async () => {
+    if (!githubToken) return;
+    setFetchingRepos(true);
+    setError('');
+    try {
+      const res = await axios.get('https://api.github.com/user/repos?per_page=100&sort=updated', {
+        headers: {
+          Authorization: `token ${githubToken}`
+        }
+      });
+      setRepos(res.data);
+    } catch (err) {
+      setError('Failed to fetch repositories. Please check your access token.');
+    } finally {
+      setFetchingRepos(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!selectedRepo) return;
+    
     setError('');
     setLoading(true);
     try {
       const res = await axios.post(`${BRAIN_API}/index`, {
-        project_name: projectName,
-        repository_url: repoUrl,
+        project_name: selectedRepo.name,
+        repository_url: selectedRepo.html_url,
         github_token: githubToken,
       });
       // Store job_id so DashboardHome can poll it
       localStorage.setItem('mm_job_id', res.data.job_id);
-      localStorage.setItem('mm_repo_url', repoUrl);
-      localStorage.setItem('mm_project_name', projectName);
+      localStorage.setItem('mm_repo_url', selectedRepo.html_url);
+      localStorage.setItem('mm_project_name', selectedRepo.name);
       navigate('/dashboard');
     } catch (err) {
       const msg = err.response?.data?.detail;
@@ -58,46 +79,10 @@ export default function ProjectSetupPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
 
+          {/* Step 1: Token Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
-              Project Name
-            </label>
-            <div className="relative">
-              <input
-                id="project-name"
-                type="text"
-                required
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="My Awesome Project"
-                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
-              GitHub Repository URL
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                <Folder className="w-5 h-5" />
-              </div>
-              <input
-                id="repo-url"
-                type="url"
-                required
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                placeholder="https://github.com/user/repository"
-                className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl pl-12 pr-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
-              GitHub Access Token <span className="text-gray-400 font-normal">(optional)</span>
+              GitHub Access Token
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
@@ -106,42 +91,98 @@ export default function ProjectSetupPage() {
               <input
                 id="access-token"
                 type="password"
+                required
                 value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
+                onChange={(e) => {
+                  setGithubToken(e.target.value);
+                  setRepos([]); // Reset repos if token changes
+                  setSelectedRepo(null);
+                }}
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                 className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl pl-12 pr-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm"
               />
             </div>
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 ml-1">
-              Needed for private repositories. Requires <code>repo</code> and <code>read:org</code> scopes.
+              Requires <code>repo</code> scope to access private repositories.
             </p>
           </div>
 
+          {/* Fetch Repos Button */}
+          {repos.length === 0 && (
+            <button
+              type="button"
+              onClick={fetchRepos}
+              disabled={fetchingRepos || !githubToken}
+              className="w-full flex items-center justify-center gap-2 bg-gray-900 dark:bg-gray-800 hover:bg-gray-800 dark:hover:bg-gray-700 disabled:opacity-60 text-white font-medium rounded-2xl px-6 py-4 transition-all shadow-md mt-4"
+            >
+              {fetchingRepos ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Fetching Repositories...
+                </>
+              ) : (
+                'Fetch My Repositories'
+              )}
+            </button>
+          )}
+
+          {/* Step 2: Repo Selection */}
+          {repos.length > 0 && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
+                Select Repository to Index
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                  <Folder className="w-5 h-5" />
+                </div>
+                <select
+                  required
+                  value={selectedRepo ? selectedRepo.clone_url : ''}
+                  onChange={(e) => {
+                    const repo = repos.find(r => r.clone_url === e.target.value);
+                    setSelectedRepo(repo);
+                  }}
+                  className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl pl-12 pr-6 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white transition-all shadow-sm appearance-none"
+                >
+                  <option value="" disabled>Select a repository...</option>
+                  {repos.map(repo => (
+                    <option key={repo.id} value={repo.clone_url}>
+                      {repo.full_name} {repo.private ? '(Private)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Submit to Backend */}
+              <button
+                id="setup-submit"
+                type="submit"
+                disabled={loading || !selectedRepo}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-medium rounded-2xl px-6 py-4 transition-all shadow-lg hover:shadow-indigo-500/30 mt-6"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Starting indexing...
+                  </>
+                ) : (
+                  <>
+                    Start Indexing & Continue
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {error && (
-            <div className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-2xl px-5 py-4">
+            <div className="flex items-start gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-2xl px-5 py-4 mt-4">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               {error}
             </div>
           )}
 
-          <button
-            id="setup-submit"
-            type="submit"
-            disabled={loading || !repoUrl}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-medium rounded-2xl px-6 py-4 transition-all shadow-lg hover:shadow-indigo-500/30 mt-4"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Starting indexing…
-              </>
-            ) : (
-              <>
-                Continue to Dashboard
-                <ArrowRight className="w-5 h-5" />
-              </>
-            )}
-          </button>
         </form>
 
       </div>

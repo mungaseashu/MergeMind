@@ -51,7 +51,7 @@ def _extract_pr_model(payload: dict) -> PullRequestModel:
     )
 
 
-def _run_incremental_update(repo_full_name: str, pr_number: int, pr_id: str, repo_id: str):
+def _run_incremental_update(repo_full_name: str, pr_number: int, pr_id: str, repo_id: str, github_token: str = None):
     """
     Background thread target:
     1. Fetch the list of changed files for the PR from GitHub.
@@ -62,7 +62,7 @@ def _run_incremental_update(repo_full_name: str, pr_number: int, pr_id: str, rep
     neo4j_client.connect()
 
     try:
-        changed_files = get_changed_files(repo_full_name, pr_number)
+        changed_files = get_changed_files(repo_full_name, pr_number, github_token=github_token)
 
         # Link PR to each changed File node
         for f in changed_files:
@@ -71,14 +71,14 @@ def _run_incremental_update(repo_full_name: str, pr_number: int, pr_id: str, rep
                 rb.link_pr_to_file(pr_id, file_id)
 
         # Re-parse and upsert changed file code entities
-        stats = process_changed_files(repo_id, changed_files)
+        stats = process_changed_files(repo_id, changed_files, github_token=github_token)
         print(f"[PR #{pr_number}] Incremental update: {stats}")
 
     except Exception as e:
         print(f"[PR #{pr_number}] Incremental update failed: {e}")
 
 
-def handle_pr_opened(payload: dict):
+def handle_pr_opened(payload: dict, github_token: str = None):
     """
     Handles 'opened' and 're-opened' PR actions.
     - Creates the PullRequest node in Neo4j.
@@ -101,14 +101,14 @@ def handle_pr_opened(payload: dict):
     # Run incremental file updates in the background (non-blocking)
     t = threading.Thread(
         target=_run_incremental_update,
-        args=(repo_full_name, pr_model.pr_number, pr_model.id, repo_id)
+        args=(repo_full_name, pr_model.pr_number, pr_model.id, repo_id, github_token)
     )
     t.start()
 
     return {"status": "accepted", "job": "pr_opened", "pr_id": pr_model.id}
 
 
-def handle_pr_synchronize(payload: dict):
+def handle_pr_synchronize(payload: dict, github_token: str = None):
     """
     Handles 'synchronize' action (new commits pushed to an existing PR).
     - Updates the PullRequest node (already exists via MERGE).
@@ -131,7 +131,7 @@ def handle_pr_synchronize(payload: dict):
     # Re-run the incremental update in the background
     t = threading.Thread(
         target=_run_incremental_update,
-        args=(repo_full_name, pr_model.pr_number, pr_model.id, repo_id)
+        args=(repo_full_name, pr_model.pr_number, pr_model.id, repo_id, github_token)
     )
     t.start()
 
